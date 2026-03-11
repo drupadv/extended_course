@@ -32,6 +32,28 @@ extended_courses_collection = db[EXTENDED_COLLECTION_NAME]
 currentallocation_collection = db[CURRENTALLOCATION_COLLECTION_NAME]
 
 
+def is_extend_true(value):
+    """
+    Accept extend values stored as:
+    - True
+    - False
+    - "true"
+    - "false"
+    - "True"
+    - "False"
+    - " TRUE "
+    - " FALSE "
+    Returns True only when the normalized value is true.
+    """
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+
+    return False
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -42,8 +64,6 @@ def index():
             return redirect(url_for("index"))
 
         try:
-            # Validation 1:
-            # Only allow insert into extended_courses if tag exists in currentallocation.tag
             currentallocation_match = currentallocation_collection.find_one({"tag": course_tag})
 
             if not currentallocation_match:
@@ -53,11 +73,10 @@ def index():
                 )
                 return redirect(url_for("index"))
 
-            # Validation 2:
-            # If same course tag already exists in extended_courses, delete old entry/entries
+            existing_entry = extended_courses_collection.find_one({"course_tag": course_tag})
+
             extended_courses_collection.delete_many({"course_tag": course_tag})
 
-            # Insert fresh document
             document = {
                 "course_tag": course_tag,
                 "submitted_at": datetime.now(timezone.utc)
@@ -65,7 +84,13 @@ def index():
 
             extended_courses_collection.insert_one(document)
 
-            flash(f"Course tag '{course_tag}' was already present. Updated old entry.", "success")
+            if existing_entry:
+                flash(
+                    f"Course tag '{course_tag}' already existed. Old entry removed and new entry added.",
+                    "success"
+                )
+            else:
+                flash(f"Course tag '{course_tag}' submitted successfully.", "success")
 
         except PyMongoError as exc:
             flash(f"Failed to submit course tag. Error: {exc}", "error")
@@ -73,6 +98,76 @@ def index():
         return redirect(url_for("index"))
 
     return render_template("index.html")
+
+
+@app.route("/verify-extensions", methods=["GET", "POST"])
+def verify_extensions():
+    verified = False
+    total_source_tags = 0
+    marked_true_count = 0
+    missed_count = 0
+    marked_true_tags = []
+    missed_tags = []
+
+    if request.method == "POST":
+        try:
+            source_docs = list(
+                extended_courses_collection.find(
+                    {},
+                    {"_id": 0, "course_tag": 1, "submitted_at": 1}
+                )
+            )
+
+            unique_tags = []
+            seen = set()
+
+            for doc in source_docs:
+                course_tag = str(doc.get("course_tag", "")).strip()
+                if course_tag and course_tag not in seen:
+                    seen.add(course_tag)
+                    unique_tags.append(course_tag)
+
+            total_source_tags = len(unique_tags)
+
+            for course_tag in unique_tags:
+                current_doc = currentallocation_collection.find_one(
+                    {"tag": course_tag},
+                    {"_id": 0, "tag": 1, "extend": 1}
+                )
+
+                extend_value = current_doc.get("extend") if current_doc else None
+
+                if current_doc and is_extend_true(extend_value):
+                    marked_true_tags.append(
+                        {
+                            "course_tag": course_tag,
+                            "extend_value": extend_value
+                        }
+                    )
+                else:
+                    missed_tags.append(
+                        {
+                            "course_tag": course_tag,
+                            "extend_value": extend_value if current_doc else "not found"
+                        }
+                    )
+
+            marked_true_count = len(marked_true_tags)
+            missed_count = len(missed_tags)
+            verified = True
+
+        except PyMongoError as exc:
+            flash(f"Failed to verify extensions. Error: {exc}", "error")
+
+    return render_template(
+        "verify_extensions.html",
+        verified=verified,
+        total_source_tags=total_source_tags,
+        marked_true_count=marked_true_count,
+        missed_count=missed_count,
+        marked_true_tags=marked_true_tags,
+        missed_tags=missed_tags,
+    )
 
 
 if __name__ == "__main__":

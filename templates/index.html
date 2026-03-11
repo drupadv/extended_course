@@ -9,6 +9,11 @@
 <body>
     <div class="page">
         <div class="card">
+            <div class="top-nav">
+                <a href="{{ url_for('index') }}" class="nav-link active">Extended Course Entry</a>
+                <a href="{{ url_for('verify_extensions') }}" class="nav-link">Verify Extensions</a>
+            </div>
+
             <div class="card-header">
                 <h1>Extended Course Entry</h1>
                 <p>Enter a course tag to store it in MongoDB.</p>

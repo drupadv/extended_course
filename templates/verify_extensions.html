@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Extensions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page">
+        <div class="card card-wide">
+            <div class="top-nav">
+                <a href="{{ url_for('index') }}" class="nav-link">Extended Course Entry</a>
+                <a href="{{ url_for('verify_extensions') }}" class="nav-link active">Verify Extensions</a>
+            </div>
+
+            <div class="card-header">
+                <h1>Verify Extensions</h1>
+                <p>
+                    Compare course tags from <strong>extended_courses</strong> against
+                    <strong>currentallocation</strong> and verify whether
+                    <strong>extend</strong> is set to <strong>true</strong> or <strong>"true"</strong>.
+                </p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" class="form">
+                <button type="submit">Verify Extensions</button>
+            </form>
+
+            {% if verified %}
+                <div class="results">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">Total Course Tags</span>
+                            <span class="stat-value">{{ total_source_tags }}</span>
+                        </div>
+                        <div class="stat-card success-card">
+                            <span class="stat-label">Extensions Enabled</span>
+                            <span class="stat-value success-text">{{ marked_true_count }}</span>
+                        </div>
+                        <div class="stat-card error-card">
+                            <span class="stat-label">Extensions Misses / Need Action</span>
+                            <span class="stat-value error-text">{{ missed_count }}</span>
+                        </div>
+                    </div>
+
+                    <div class="result-sections">
+                        <div class="result-panel green-panel">
+                            <h2>Extensions Enabled</h2>
+                            {% if marked_true_tags %}
+                                <ul class="tag-list">
+                                    {% for item in marked_true_tags %}
+                                        <li class="tag-item success-item">
+                                            <span class="tag-name">{{ item.course_tag }}</span>
+                                            <span class="tag-meta">extend = {{ item.extend_value }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="empty-state">No course tags are currently marked as extend = true.</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="result-panel red-panel">
+                            <h2>Extensions Misses / Need Action</h2>
+                            {% if missed_tags %}
+                                <ul class="tag-list">
+                                    {% for item in missed_tags %}
+                                        <li class="tag-item error-item">
+                                            <span class="tag-name">{{ item.course_tag }}</span>
+                                            <span class="tag-meta">extend = {{ item.extend_value }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="empty-state">No missed course tags found.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
